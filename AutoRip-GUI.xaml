@@ -1,0 +1,215 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AutoRip"
+        Height="680" Width="520"
+        MinHeight="500" MinWidth="400"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI" FontSize="13">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ── Drive Selection ── -->
+        <TextBlock Grid.Row="0" Text="Optical Drive" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <ComboBox x:Name="ComboDrive"
+                      Grid.Column="0"
+                      Height="28"
+                      VerticalContentAlignment="Center"/>
+            <Button x:Name="BtnRefresh"
+                    Grid.Column="1"
+                    Content="Refresh"
+                    Width="72" Height="28"
+                    Margin="8,0,0,0"/>
+        </Grid>
+
+        <!-- ── Media Type ── -->
+        <TextBlock Grid.Row="3" Text="Media Type" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <StackPanel Grid.Row="4" Orientation="Vertical">
+            <StackPanel Orientation="Horizontal">
+                <RadioButton x:Name="RadioMovie"
+                             Content="Movie"
+                             IsChecked="True"
+                             Margin="0,0,20,0"
+                             VerticalContentAlignment="Center"/>
+                <RadioButton x:Name="RadioTV"
+                             Content="TV Show"
+                             VerticalContentAlignment="Center"/>
+            </StackPanel>
+
+            <!-- TV format selector — shown only when TV Show is selected -->
+            <Grid x:Name="PanelTVFormat" Visibility="Collapsed" Margin="0,8,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0"
+                           Text="Episode format:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,10,0"/>
+                <ComboBox x:Name="CboTVFormat"
+                          Grid.Row="0" Grid.Column="1"
+                          IsEditable="True"
+                          Height="28"
+                          VerticalContentAlignment="Center">
+                    <ComboBoxItem Content="{}{n}/Season {s}/{n} - {s00e00} - {t}"/>
+                    <ComboBoxItem Content="{}{n}/Season {s}/{s00e00} - {t}"/>
+                    <ComboBoxItem Content="{}{n}/{s00e00} - {t}"/>
+                    <ComboBoxItem Content="{}{n}/Season {s}/{n} - {s00e00}"/>
+                </ComboBox>
+                <TextBlock x:Name="LblFormatExample"
+                           Grid.Row="1" Grid.ColumnSpan="2"
+                           Margin="0,4,0,0"
+                           FontSize="11"
+                           FontStyle="Italic"
+                           Foreground="#888888"/>
+                <TextBlock Grid.Row="2" Grid.Column="0"
+                           Text="Season:"
+                           VerticalAlignment="Center"
+                           Margin="0,6,10,0"/>
+                <TextBox x:Name="TxtSeason"
+                         Grid.Row="2" Grid.Column="1"
+                         Height="28" Width="60"
+                         HorizontalAlignment="Left"
+                         VerticalContentAlignment="Center"
+                         Padding="4,0"
+                         Margin="0,6,0,0"
+                         Text="1"/>
+            </Grid>
+        </StackPanel>
+
+        <!-- ── Manual Title Override ── -->
+        <Grid Grid.Row="6" Margin="0,0,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <CheckBox x:Name="ChkManualTitle"
+                      Grid.Column="0"
+                      Content="Override title:"
+                      VerticalAlignment="Center"
+                      Margin="0,0,8,0"/>
+            <TextBox x:Name="TxtManualTitle"
+                     Grid.Column="1"
+                     Height="28"
+                     IsEnabled="False"
+                     VerticalContentAlignment="Center"
+                     Padding="4,0"/>
+        </Grid>
+
+        <!-- ── Start Button ── -->
+        <Button x:Name="BtnStart"
+                Grid.Row="7"
+                Content="Start Rip"
+                Height="36"
+                FontSize="14"
+                FontWeight="SemiBold"/>
+
+        <!-- ── FileBot Title Override (hidden until FileBot fails to match) ── -->
+        <Grid x:Name="PanelFileBot"
+              Grid.Row="9"
+              Visibility="Collapsed"
+              Margin="0,0,0,8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0"
+                       Text="FileBot could not match the disc. Enter the correct title:"
+                       Foreground="#C0392B"
+                       FontWeight="SemiBold"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,4"/>
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="TxtTitle"
+                         Grid.Column="0"
+                         Height="28"
+                         VerticalContentAlignment="Center"
+                         Padding="4,0"/>
+                <Button x:Name="BtnSubmitTitle"
+                        Grid.Column="1"
+                        Content="Submit"
+                        Width="70" Height="28"
+                        Margin="8,0,0,0"/>
+                <Button x:Name="BtnSkipTitle"
+                        Grid.Column="2"
+                        Content="Skip"
+                        Width="60" Height="28"
+                        Margin="6,0,0,0"/>
+            </Grid>
+        </Grid>
+
+        <!-- ── Progress Bar (hidden until transcode starts) ── -->
+        <ProgressBar x:Name="ProgressBar"
+                     Grid.Row="10"
+                     Height="18"
+                     Minimum="0" Maximum="100"
+                     Visibility="Collapsed"/>
+
+        <!-- ── Log Pane ── -->
+        <Border Grid.Row="12"
+                BorderBrush="#AAAAAA"
+                BorderThickness="1"
+                CornerRadius="2">
+            <ScrollViewer x:Name="LogScroller"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <TextBox x:Name="TxtLog"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"
+                         FontFamily="Consolas" FontSize="11"
+                         Background="#1E1E1E" Foreground="#D4D4D4"
+                         BorderThickness="0"
+                         Padding="8"
+                         AcceptsReturn="True"/>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ── Completion Buttons (hidden until rip finishes) ── -->
+        <StackPanel x:Name="PanelComplete"
+                    Grid.Row="13"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,10,0,0"
+                    Visibility="Collapsed">
+            <Button x:Name="BtnRipAnother"
+                    Content="Rip Another"
+                    Width="100" Height="32"
+                    Margin="0,0,8,0"/>
+            <Button x:Name="BtnExit"
+                    Content="Exit"
+                    Width="72" Height="32"/>
+        </StackPanel>
+
+    </Grid>
+</Window>
