@@ -16,7 +16,7 @@
                        titles, in disc order.
         3. RENAME   — FileBot renames and moves transcoded file(s) using database
                        metadata. Movies use TheMovieDB ("Title (Year)/Title (Year).mkv").
-                       TV uses TheTVDB ("{show}/Season {s}/{show} - {s00e00} - {t}").
+                       TV uses TheTVDB ("{n} ({y})/Season {s}/{n} - {s00e00} - {t}").
                        If FileBot cannot auto-match, the GUI prompts for a manual title.
         4. EXTRAS   — Any MKV files remaining after FileBot has moved the main content
                        are treated as extras, moved to an "extras" subfolder, and transcoded.
@@ -24,21 +24,22 @@
 
 .NOTES
     ── Configuration ────────────────────────────────────────────────────────────────
-    All user-configurable paths and settings live in the Variable Configuration
-    region near the top of the script. The following variables are defined there:
+    All user-configurable paths and settings live in config.json in the same
+    directory as the script. Edit that file — no need to touch the script itself.
+    The following keys are defined there:
 
-    $MediaDir            Root media folder (e.g. "E:/Media")
-    $MakeMKVPath         Path to the MakeMKV folder
-    $FfmpegPath          Path to ffmpeg.exe
-    $FfProbePath         Path to ffprobe.exe
-    $HandbrakeCLI        Path to HandBrakeCLI.exe
-    $FileBotPath         Path to filebot.exe
-    $RipperLog           Path to the main rip log file
-    $FileBotLog          Path to the FileBot log file
-    $CompletionSound     Sound played on successful completion
-    $AlertSound          Sound played when manual title input is needed
-    $TVRipMinLength      Minimum title duration for TV rips in seconds (default: 30)
-    $MovieRipMinLength   Minimum title duration for movie rips in seconds (default: 300)
+    MediaDir            Root media folder (e.g. "E:/Media")
+    MakeMKVPath         Path to the MakeMKV folder
+    FfmpegPath          Path to ffmpeg.exe
+    FfProbePath         Path to ffprobe.exe
+    HandbrakeCLI        Path to HandBrakeCLI.exe
+    FileBotPath         Path to filebot.exe
+    LogDir              Base folder for all log files (ripper.log, filebot.log written here)
+    TVRipMinLength      Minimum title duration for TV rips in seconds (default: 30)
+    MovieRipMinLength   Minimum title duration for movie rips in seconds (default: 300)
+
+    Sound files are bundled with the script in the .\sound_files\ folder — swap
+    the files there to change the completion/alert sounds.
 
     ── Resolution handling ───────────────────────────────────────────────────────────
     ffprobe auto-detects source resolution before each transcode. DVD sources
@@ -63,6 +64,7 @@
 #region ── Bootstrap ─────────────────────────────────────────────────────────
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
+Add-Type -AssemblyName System.Windows.Forms
 
 $xamlPath = "$PSScriptRoot\AutoRip-GUI.xaml"
 $raw      = (Get-Content $xamlPath -Raw) -replace 'x:Name', 'Name'
@@ -91,24 +93,45 @@ $TxtSeason        = $window.FindName('TxtSeason')
 $ChkManualTitle   = $window.FindName('ChkManualTitle')
 $TxtManualTitle = $window.FindName('TxtManualTitle')
 $PanelComplete  = $window.FindName('PanelComplete')
-$BtnRipAnother  = $window.FindName('BtnRipAnother')
-$BtnExit        = $window.FindName('BtnExit')
+$BtnRipAnother   = $window.FindName('BtnRipAnother')
+$BtnEject        = $window.FindName('BtnEject')
+$BtnExit         = $window.FindName('BtnExit')
+$TabInput        = $window.FindName('TabInput')
+$TxtInputFolder  = $window.FindName('TxtInputFolder')
+$BtnBrowseFolder = $window.FindName('BtnBrowseFolder')
 #endregion
 
 #region ── Variable Configuration ────────────────────────────────────────────
-$MediaDir        = 'E:/Media'
-$MakeMKVPath     = 'C:\Program Files (x86)\MakeMKV'
-$FfmpegPath      = 'C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe'
-$FfProbePath     = 'C:\Program Files (x86)\ffmpeg\bin\ffprobe.exe'
-$HandbrakeCLI    = 'C:\Program Files\HandBrake\HandBrakeCLI.exe'
-$FileBotPath     = 'C:/Program Files/FileBot/filebot.exe'
-$RipperLog       = 'C:\Temp\Ripper.log'
-$FileBotLog      = 'C:\Temp\filebot.log'
+#Load user configuration from config.json
+if (-not (Test-Path "$PSScriptRoot\config.json")) {
+    [System.Windows.MessageBox]::Show(
+        "config.json not found in:`n$PSScriptRoot`n`nCopy config.json from the repository and fill in your tool paths before running.",
+        "AutoRip — Configuration Missing",
+        [System.Windows.MessageBoxButton]::OK,
+        [System.Windows.MessageBoxImage]::Error
+    ) | Out-Null
+    exit
+}
+$config = Get-Content "$PSScriptRoot\config.json" -Raw | ConvertFrom-Json
+
+$MediaDir          = $config.MediaDir            # Root media folder (e.g. "E:/Media")
+$MakeMKVPath       = $config.MakeMKVPath         # Path to the MakeMKV folder
+$FfmpegPath        = $config.FfmpegPath          # Path to ffmpeg.exe
+$FfProbePath       = $config.FfProbePath         # Path to ffprobe.exe
+$HandbrakeCLI      = $config.HandbrakeCLI        # Path to HandBrakeCLI.exe
+$FileBotPath       = $config.FileBotPath         # Path to filebot.exe
+$LogDir            = $config.LogDir              # Base folder for all log files
+$TVRipMinLength    = $config.TVRipMinLength      # MakeMKV --minlength for TV rips (seconds)
+$MovieRipMinLength = $config.MovieRipMinLength   # MakeMKV --minlength for movie rips (seconds)
+
+#Sound file paths — bundled with the script, swap the files in .\sound_files\ to change
 $CompletionSound   = "$PSScriptRoot\sound_files\mariomushroom.mp3"
 $AlertSound        = "$PSScriptRoot\sound_files\metalgear.mp3"
-$TVRipMinLength    = 30    # MakeMKV --minlength for TV rips (seconds)
-$MovieRipMinLength = 300   # MakeMKV --minlength for movie rips (seconds)
 #endregion
+
+if (-not (Test-Path $LogDir)) { New-Item $LogDir -ItemType Directory -Force | Out-Null }
+$RipperLog  = Join-Path $LogDir "ripper.log"
+$FileBotLog = Join-Path $LogDir "filebot.log"
 
 #region ── Shared state (thread-safe) ────────────────────────────────────────
 # ConcurrentQueue is used for the log because multiple threads enqueue messages
@@ -213,12 +236,14 @@ $timer.Add_Tick({
     # Pipeline finished
     if ($sync.Done -or $sync.Failed) {
         $timer.Stop()
-        $BtnStart.IsEnabled       = $true
         $PanelFileBot.Visibility  = 'Collapsed'
 
         if ($sync.Done) {
             $PanelComplete.Visibility = 'Visible'
             Start-Process 'wmplayer.exe' -ArgumentList "`"$CompletionSound`"" -WindowStyle Hidden
+            #BtnStart stays disabled — user must click "Rip Another" to set up the next rip.
+        } else {
+            $BtnStart.IsEnabled = $true
         }
     }
 })
@@ -367,28 +392,35 @@ $pipelineScript = {
     }
 
     try {
-        $isTV = $OutputDir -match '\\TV$'
+        $isTV           = $OutputDir -match '\\TV$'
+        $InputDirectory = if ($SkipRip) { $ManualInputDir } else { Join-Path $OutputDir $VolumeName }
 
         # ── Step 1: Rip ──────────────────────────────────────────────────────
         <#
             * MakeMKV extracts titles from the disc as raw MKV files.
+            * Skipped when SkipRip is true (Process Folder tab — files already on disk).
             * Media Type Behavior:
                 * Movies - rip all titles above $MovieRipMinLength seconds.
                 * TV - rip all titles above $TVRipMinLength seconds.
         #>
-        $Dir2 = Join-Path $OutputDir $VolumeName
-        if (!(Test-Path $Dir2)) { New-Item $Dir2 -Type Directory -Force | Out-Null }
-        Log "Ripping disc into $Dir2..."
+        if (-not $SkipRip) {
+            $Dir2 = $InputDirectory
+            if (!(Test-Path $Dir2)) { New-Item $Dir2 -Type Directory -Force | Out-Null }
+            Log "Ripping disc into $Dir2..."
 
-        if ($isTV) {
-            & "$MakeMKVPath\makemkvcon64.exe" "--minlength=$TVRipMinLength" mkv disc:0 all "$Dir2" 2>&1 |
-                ForEach-Object { $sync.Log.Enqueue("$_") }
+            if ($isTV) {
+                & "$MakeMKVPath\makemkvcon64.exe" "--minlength=$TVRipMinLength" mkv disc:0 all "$Dir2" 2>&1 |
+                    ForEach-Object { $sync.Log.Enqueue("$_") }
+            } else {
+                & "$MakeMKVPath\makemkvcon64.exe" "--minlength=$MovieRipMinLength" mkv disc:0 all "$Dir2" 2>&1 |
+                    ForEach-Object { $sync.Log.Enqueue("$_") }
+            }
+            Log "Rip complete."
+            Log '================'
         } else {
-            & "$MakeMKVPath\makemkvcon64.exe" "--minlength=$MovieRipMinLength" mkv disc:0 all "$Dir2" 2>&1 |
-                ForEach-Object { $sync.Log.Enqueue("$_") }
+            Log "Skipping rip — processing existing folder: $InputDirectory"
+            Log '================'
         }
-        Log "Rip complete."
-        Log '================'
 
         # ── Step 2: Transcode ────────────────────────────────────────────────
         <#
@@ -397,7 +429,6 @@ $pipelineScript = {
                 * Movies - transcode the largest file (assumed to be the main feature).
                 * TV - transcode all episode files, excluding play-all titles, in disc order.
         #>
-        $InputDirectory    = Join-Path $OutputDir $VolumeName
         $AllFiles          = Get-ChildItem $InputDirectory -File
         $convertedEpisodes = @()
 
@@ -471,10 +502,17 @@ $pipelineScript = {
                 $found = Get-ChildItem $OutputDir -Directory |
                     ForEach-Object { Get-ChildItem $_.FullName -Directory -Filter "Season $seasonNumber" -ErrorAction SilentlyContinue } |
                     Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                #Bug fix: only override $showQuery when the found folder is the same show.
+                #Without this check, ripping Show B after Show A at the same season would find
+                #Show A's folder and silently swap the FileBot query to Show A's name.
                 if ($found) {
-                    $seasonFolder = $found.FullName
-                    $showQuery    = $found.Parent.Name
-                    Log "Matched existing show folder: '$showQuery'"
+                    $derivedClean = ($showQuery         -replace '[\s_]').ToLower()
+                    $foundClean   = ($found.Parent.Name -replace '[\s_]').ToLower()
+                    if ($foundClean -like "*$derivedClean*" -or $derivedClean -like "*$foundClean*") {
+                        $seasonFolder = $found.FullName
+                        $showQuery    = $found.Parent.Name
+                        Log "Matched existing show folder: '$showQuery'"
+                    }
                 }
             }
             $startEpisode = (Get-ChildItem $seasonFolder -Filter '*.mkv' -File -ErrorAction SilentlyContinue).Count + 1
@@ -565,7 +603,7 @@ $pipelineScript = {
                 --format '{n} ({y})/{n} ({y})' `
                 --output $OutputDir `
                 --action move `
-                --conflict index `
+                --conflict skip `
                 --log all `
                 --log-file $FileBotLog `
                 -non-strict 2>&1 | ForEach-Object { $sync.Log.Enqueue("$_") }
@@ -593,7 +631,7 @@ $pipelineScript = {
                         --format '{n} ({y})/{n} ({y})' `
                         --output $OutputDir `
                         --action move `
-                        --conflict index `
+                        --conflict skip `
                         --log all `
                         --log-file $FileBotLog `
                         -non-strict 2>&1 | ForEach-Object { $sync.Log.Enqueue("$_") }
@@ -666,11 +704,30 @@ $pipelineScript = {
 #region ── Events ─────────────────────────────────────────────────────────────
 $BtnRefresh.Add_Click({ Update-DriveList })
 
+$BtnEject.Add_Click({
+    $selectedItem = $ComboDrive.SelectedItem -as [string]
+    if (-not $selectedItem) { return }
+    $driveLetter = ($selectedItem -split ' — ')[0].Trim()
+    $shell = New-Object -ComObject Shell.Application
+    $shell.Namespace(17).Items() |
+        Where-Object { $_.Path -eq "${driveLetter}\" } |
+        ForEach-Object { $_.InvokeVerb('Eject') }
+})
+
+$BtnBrowseFolder.Add_Click({
+    $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dlg.Description       = "Select the folder containing your ripped MKV files"
+    $dlg.ShowNewFolderButton = $false
+    if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        $TxtInputFolder.Text = $dlg.SelectedPath
+    }
+})
+
 $formatExamples = @{
-    '{n}/Season {s}/{n} - {s00e00} - {t}' = 'e.g.  Seinfeld / Season 4 / Seinfeld - S04E01 - The Trip'
-    '{n}/Season {s}/{s00e00} - {t}'        = 'e.g.  Seinfeld / Season 4 / S04E01 - The Trip'
-    '{n}/{s00e00} - {t}'                   = 'e.g.  Seinfeld / S04E01 - The Trip  (no season folders)'
-    '{n}/Season {s}/{n} - {s00e00}'        = 'e.g.  Seinfeld / Season 4 / Seinfeld - S04E01  (no episode title)'
+    '{n} ({y})/Season {s}/{n} - {s00e00} - {t}' = 'e.g.  Seinfeld (1989) / Season 4 / Seinfeld - S04E01 - The Trip'
+    '{n} ({y})/Season {s}/{s00e00} - {t}'        = 'e.g.  Seinfeld (1989) / Season 4 / S04E01 - The Trip'
+    '{n} ({y})/{s00e00} - {t}'                   = 'e.g.  Seinfeld (1989) / S04E01 - The Trip  (no season folders)'
+    '{n} ({y})/Season {s}/{n} - {s00e00}'        = 'e.g.  Seinfeld (1989) / Season 4 / Seinfeld - S04E01  (no episode title)'
 }
 
 $CboTVFormat.Add_SelectionChanged({
@@ -714,9 +771,7 @@ $BtnStart.Add_Click({
     $PanelFileBot.Visibility  = 'Collapsed'
     $BtnStart.IsEnabled       = $false
 
-    # Resolve drive + media type + optional manual title
-    $selectedItem   = $ComboDrive.SelectedItem -as [string]
-    $volumeName     = ($selectedItem -split ' — ', 2)[1].Trim()
+    # Resolve input source, media type, and optional manual title
     $mediaType      = if ($RadioMovie.IsChecked) { 'Movies' } else { 'TV' }
     $outputDir      = "$MediaDir\$mediaType"
     $manualTitle    = if ($ChkManualTitle.IsChecked -and -not [string]::IsNullOrWhiteSpace($TxtManualTitle.Text)) {
@@ -725,6 +780,29 @@ $BtnStart.Add_Click({
     $tvFormat       = $CboTVFormat.Text
     $seasonOverride = [int]($TxtSeason.Text -replace '\D', '')
     if ($seasonOverride -lt 1) { $seasonOverride = 1 }
+
+    if ($TabInput.SelectedIndex -eq 1) {
+        #Process Folder tab — validate and use the selected directory
+        $manualInputDir = $TxtInputFolder.Text.Trim()
+        if ([string]::IsNullOrWhiteSpace($manualInputDir) -or -not (Test-Path $manualInputDir)) {
+            [System.Windows.MessageBox]::Show(
+                "Please select a valid folder before starting.",
+                "AutoRip — No Folder Selected",
+                [System.Windows.MessageBoxButton]::OK,
+                [System.Windows.MessageBoxImage]::Warning
+            ) | Out-Null
+            $BtnStart.IsEnabled = $true
+            return
+        }
+        $skipRip    = $true
+        $volumeName = Split-Path $manualInputDir -Leaf
+    } else {
+        #Rip from Disc tab — use the selected optical drive
+        $selectedItem   = $ComboDrive.SelectedItem -as [string]
+        $volumeName     = ($selectedItem -split ' — ', 2)[1].Trim()
+        $skipRip        = $false
+        $manualInputDir = $null
+    }
 
     # Build and configure runspace — CreateDefault2() is required for PS7 compatibility
     $iss = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault2()
@@ -748,6 +826,8 @@ $BtnStart.Add_Click({
     $rs.SessionStateProxy.SetVariable('SeasonOverride',   $seasonOverride)
     $rs.SessionStateProxy.SetVariable('TVRipMinLength',   $TVRipMinLength)
     $rs.SessionStateProxy.SetVariable('MovieRipMinLength',$MovieRipMinLength)
+    $rs.SessionStateProxy.SetVariable('SkipRip',          $skipRip)
+    $rs.SessionStateProxy.SetVariable('ManualInputDir',   $manualInputDir)
 
     $ps = [powershell]::Create()
     $ps.Runspace = $rs
@@ -777,7 +857,9 @@ $BtnRipAnother.Add_Click({
     $ProgressBar.Visibility   = 'Collapsed'
     $ProgressBar.Value        = 0
     $TxtLog.Clear()
+    $TxtInputFolder.Text      = ''
     Update-DriveList
+    $BtnStart.IsEnabled = $true  #Re-enable Start after Done — gate prevents clicking Start again without going through here first.
 })
 
 $BtnExit.Add_Click({ $window.Close() })

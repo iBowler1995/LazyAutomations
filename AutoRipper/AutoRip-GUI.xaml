@@ -25,23 +25,53 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- ── Drive Selection ── -->
-        <TextBlock Grid.Row="0" Text="Optical Drive" FontWeight="SemiBold" Margin="0,0,0,4"/>
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <ComboBox x:Name="ComboDrive"
-                      Grid.Column="0"
-                      Height="28"
-                      VerticalContentAlignment="Center"/>
-            <Button x:Name="BtnRefresh"
-                    Grid.Column="1"
-                    Content="Refresh"
-                    Width="72" Height="28"
-                    Margin="8,0,0,0"/>
-        </Grid>
+        <!-- ── Input Selection (Disc or Folder) ── -->
+        <TabControl x:Name="TabInput"
+                    Grid.Row="0" Grid.RowSpan="2"
+                    Padding="8,4,8,8">
+            <TabItem Header="Rip from Disc">
+                <Grid Margin="0,4,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ComboBox x:Name="ComboDrive"
+                              Grid.Column="0"
+                              Height="28"
+                              VerticalContentAlignment="Center"/>
+                    <Button x:Name="BtnRefresh"
+                            Grid.Column="1"
+                            Content="Refresh"
+                            Width="72" Height="28"
+                            Margin="8,0,0,0"/>
+                    <Button x:Name="BtnEject"
+                            Grid.Column="2"
+                            Content="Eject"
+                            Width="60" Height="28"
+                            Margin="8,0,0,0"/>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Process Folder">
+                <Grid Margin="0,4,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="TxtInputFolder"
+                             Grid.Column="0"
+                             Height="28"
+                             IsReadOnly="True"
+                             VerticalContentAlignment="Center"
+                             Padding="4,0"/>
+                    <Button x:Name="BtnBrowseFolder"
+                            Grid.Column="1"
+                            Content="Browse..."
+                            Width="80" Height="28"
+                            Margin="8,0,0,0"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
 
         <!-- ── Media Type ── -->
         <TextBlock Grid.Row="3" Text="Media Type" FontWeight="SemiBold" Margin="0,0,0,4"/>
@@ -77,10 +107,10 @@
                           IsEditable="True"
                           Height="28"
                           VerticalContentAlignment="Center">
-                    <ComboBoxItem Content="{}{n}/Season {s}/{n} - {s00e00} - {t}"/>
-                    <ComboBoxItem Content="{}{n}/Season {s}/{s00e00} - {t}"/>
-                    <ComboBoxItem Content="{}{n}/{s00e00} - {t}"/>
-                    <ComboBoxItem Content="{}{n}/Season {s}/{n} - {s00e00}"/>
+                    <ComboBoxItem Content="{}{n} ({y})/Season {s}/{n} - {s00e00} - {t}"/>
+                    <ComboBoxItem Content="{}{n} ({y})/Season {s}/{s00e00} - {t}"/>
+                    <ComboBoxItem Content="{}{n} ({y})/{s00e00} - {t}"/>
+                    <ComboBoxItem Content="{}{n} ({y})/Season {s}/{n} - {s00e00}"/>
                 </ComboBox>
                 <TextBlock x:Name="LblFormatExample"
                            Grid.Row="1" Grid.ColumnSpan="2"
@@ -196,20 +226,19 @@
         </Border>
 
         <!-- ── Completion Buttons (hidden until rip finishes) ── -->
-        <StackPanel x:Name="PanelComplete"
-                    Grid.Row="13"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    Margin="0,10,0,0"
-                    Visibility="Collapsed">
+        <Grid x:Name="PanelComplete"
+              Grid.Row="13"
+              Margin="0,10,0,0"
+              Visibility="Collapsed">
             <Button x:Name="BtnRipAnother"
                     Content="Rip Another"
                     Width="100" Height="32"
-                    Margin="0,0,8,0"/>
+                    HorizontalAlignment="Left"/>
             <Button x:Name="BtnExit"
                     Content="Exit"
-                    Width="72" Height="32"/>
-        </StackPanel>
+                    Width="72" Height="32"
+                    HorizontalAlignment="Right"/>
+        </Grid>
 
     </Grid>
 </Window>

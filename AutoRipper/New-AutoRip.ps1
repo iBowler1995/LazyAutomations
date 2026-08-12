@@ -26,7 +26,7 @@
                        metadata. Movies and multi-feature discs use TheMovieDB
                        ("Title (Year)/Title (Year).mkv"); multi-feature calls FileBot
                        once per feature. TV uses TheTVDB
-                       ("{show}/Season {s}/{show} - {s00e00} - {t}"). Episode files
+                       ("{n} ({y})/Season {s}/{n} - {s00e00} - {t}"). Episode files
                        are pre-renamed to s##e##.mkv before FileBot so disc order is
                        preserved. The show name is prompted at runtime — press Enter
                        to auto-detect from the disc volume label.
@@ -42,21 +42,24 @@
 
 .NOTES
     ── Configuration ────────────────────────────────────────────────────────────────
-    All user-configurable paths and settings live in the Variable Configuration
-    region near the top of the script — no need to hunt through the code. The
-    following variables are defined there:
+    All user-configurable paths and settings live in config.json in the same
+    directory as the script. Edit that file — no need to touch the script itself.
+    The following keys are defined there:
 
-    $MediaDir            Root media folder (e.g. "E:/Media")
-    $MakeMKVPath         Path to the MakeMKV folder
-    $FfmpegPath          Path to ffmpeg.exe
-    $FfProbePath         Path to ffprobe.exe
-    $HandbrakeCLI        Path to HandBrakeCLI.exe
-    $FileBotPath         Path to filebot.exe
-    $LogDir              Base folder for per-step log files (step2_rip.log … step6_cleanup.log, filebot.log)
-    $CompletionSound     Sound played on successful completion
-    $AlertSound          Sound played when manual title input is needed
-    $MultiMovieMinLength Default minimum feature duration in seconds for multi-feature discs (default: 3000 = 50 min)
-    $MultiTVMinLength    Minimum title duration in seconds for TV rips (default: 1200 = 20 min)
+    MediaDir            Root media folder (e.g. "E:/Media")
+    MakeMKVPath         Path to the MakeMKV folder
+    FfmpegPath          Path to ffmpeg.exe
+    FfProbePath         Path to ffprobe.exe
+    HandbrakeCLI        Path to HandBrakeCLI.exe
+    FileBotPath         Path to filebot.exe
+    LogDir              Base folder for per-step log files (step2_rip.log … step6_cleanup.log, filebot.log)
+    TVRipMinLength      Minimum title duration for TV rips in seconds (default: 30)
+    MovieRipMinLength   Minimum title duration for movie rips in seconds (default: 300)
+    MultiMovieMinLength Minimum feature duration for multi-feature discs in seconds (default: 3000 = 50 min)
+    TVFormat            FileBot format string for TV episode renaming
+
+    Sound files are bundled with the script in the .\sound_files\ folder — swap
+    the files there to change the completion/alert sounds.
 
     ── Resolution handling ───────────────────────────────────────────────────────────
     ffprobe auto-detects source resolution before each transcode. DVD sources
@@ -397,7 +400,7 @@ function Invoke-FileBot {
         pre-renamed transcoded file.
     .PARAMETER Format
         FileBot format string (e.g. "{n} ({y})/{n} ({y})" for movies,
-        "{n}/Season {s}/{n} - {s00e00} - {t}" for TV).
+        "{n} ({y})/Season {s}/{n} - {s00e00} - {t}" for TV).
     .PARAMETER OutDirectory
         Root output directory. FileBot creates the show/movie subfolder structure
         beneath this path.
@@ -650,29 +653,38 @@ function Get-DiscTitleInfo {
 #endregion ── Helper functions ───────────────────────────────────────────────────
 
 #region ── Variable Configuration ──────────────────────────────────────────────────────
-#Initializing variables
-$MediaType           = $null
-$OutputDir           = $null
-$ManualShowName      = $null
-$MediaDir            = "E:/Media"
-$TVFormat            = "{n}/Season {s}/{n} - {s00e00} - {t}"
-$MultiMovieMinLength = 3000
-$MultiFeature        = $false
-$TVRipMinLength      = 1080    #MakeMKV --minlength for TV rips (seconds)
-$MovieRipMinLength   = 300   #MakeMKV --minlength for movie rips (seconds)
+#Runtime state — not user-configurable
+$MediaType      = $null
+$OutputDir      = $null
+$ManualShowName = $null
+$MultiFeature   = $false
 
+#Load user configuration from config.json
+if (-not (Test-Path "$PSScriptRoot\config.json")) {
+    Write-Host "ERROR: config.json not found in $PSScriptRoot" -ForegroundColor Red
+    Write-Host "Copy config.json from the repository and fill in your tool paths before running." -ForegroundColor Yellow
+    Read-Host "Press Enter to exit"
+    exit
+}
+$config = Get-Content "$PSScriptRoot\config.json" -Raw | ConvertFrom-Json
 
-#Configuring Log Paths
-$LogDir     = "C:\temp\log"    # Base folder — one .log file per step is written here
+$MediaDir            = $config.MediaDir            # Root media folder (e.g. "E:/Media")
+$TVFormat            = $config.TVFormat            # FileBot format string for TV episode renaming
+$MultiMovieMinLength = $config.MultiMovieMinLength # Minimum feature duration for multi-feature discs (seconds)
+$TVRipMinLength      = $config.TVRipMinLength      # MakeMKV --minlength for TV rips (seconds)
+$MovieRipMinLength   = $config.MovieRipMinLength   # MakeMKV --minlength for movie rips (seconds)
 
-#Configuring Application Paths
-$FileBotPath     = "C:/Program Files/FileBot/filebot.exe"
-$MakeMKVPath     = 'C:\Program Files (x86)\MakeMKV'
-$FfmpegPath      = 'C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe'
-$FfProbePath     = 'C:\Program Files (x86)\ffmpeg\bin\ffprobe.exe'
-$HandbrakeCLI    = 'C:\Program Files\HandBrake\HandBrakeCLI.exe'
+#Application paths
+$FileBotPath  = $config.FileBotPath
+$MakeMKVPath  = $config.MakeMKVPath
+$FfmpegPath   = $config.FfmpegPath
+$FfProbePath  = $config.FfProbePath
+$HandbrakeCLI = $config.HandbrakeCLI
 
-#Soundbite Paths
+#Log paths
+$LogDir = $config.LogDir    # Base folder — one .log file per step is written here
+
+#Sound file paths — bundled with the script, swap the files in .\sound_files\ to change
 $CompletionSound = "$PSScriptRoot\sound_files\mariomushroom.mp3"
 $AlertSound      = "$PSScriptRoot\sound_files\metalgear.mp3"
 
@@ -1001,10 +1013,17 @@ Try{
                 $found = Get-ChildItem $OutputDir -Directory |
                     ForEach-Object { Get-ChildItem $_.FullName -Directory -Filter "Season $seasonNumber" -ErrorAction SilentlyContinue } |
                     Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                #Bug fix: only override $showQuery when the found folder is the same show.
+                #Without this check, ripping Show B after Show A at the same season would find
+                #Show A's folder and silently swap the FileBot query to Show A's name.
                 if ($found) {
-                    $seasonFolder = $found.FullName
-                    $showQuery    = $found.Parent.Name
-                    Write-Host "Matched existing show folder: '$showQuery'" -ForegroundColor Cyan
+                    $derivedClean = ($showQuery         -replace '[\s_]').ToLower()
+                    $foundClean   = ($found.Parent.Name -replace '[\s_]').ToLower()
+                    if ($foundClean -like "*$derivedClean*" -or $derivedClean -like "*$foundClean*") {
+                        $seasonFolder = $found.FullName
+                        $showQuery    = $found.Parent.Name
+                        Write-Host "Matched existing show folder: '$showQuery'" -ForegroundColor Cyan
+                    }
                 }
             }
             $startEpisode = (Get-ChildItem $seasonFolder -Filter '*.mkv' -File -ErrorAction SilentlyContinue).Count + 1

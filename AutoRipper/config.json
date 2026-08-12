@@ -1,0 +1,13 @@
+{
+    "MediaDir":            "E:\\Media",
+    "MakeMKVPath":         "C:\\Program Files (x86)\\MakeMKV",
+    "FfmpegPath":          "C:\\Program Files (x86)\\ffmpeg\\bin\\ffmpeg.exe",
+    "FfProbePath":         "C:\\Program Files (x86)\\ffmpeg\\bin\\ffprobe.exe",
+    "HandbrakeCLI":        "C:\\Program Files\\HandBrake\\HandBrakeCLI.exe",
+    "FileBotPath":         "C:\\Program Files\\FileBot\\filebot.exe",
+    "LogDir":              "C:\\temp\\log",
+    "TVRipMinLength":      30,
+    "MovieRipMinLength":   300,
+    "MultiMovieMinLength": 3000,
+    "TVFormat":            "{n} ({y})/Season {s}/{n} - {s00e00} - {t}"
+}
