@@ -730,6 +730,10 @@ $formatExamples = @{
     '{n} ({y})/Season {s}/{n} - {s00e00}'        = 'e.g.  Seinfeld (1989) / Season 4 / Seinfeld - S04E01  (no episode title)'
 }
 
+$TabInput.Add_SelectionChanged({
+    $BtnStart.Content = if ($TabInput.SelectedIndex -eq 1) { 'Start Transcoding' } else { 'Start Rip' }
+})
+
 $CboTVFormat.Add_SelectionChanged({
     $selected = $CboTVFormat.SelectedItem.Content
     $LblFormatExample.Text = if ($formatExamples.ContainsKey($selected)) { $formatExamples[$selected] } else { '' }
